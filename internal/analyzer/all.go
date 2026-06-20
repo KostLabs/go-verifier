@@ -16,5 +16,7 @@ func All() []runner.Analyzer {
 		AnyType{},
 		VariableShadowing{},
 		InterfaceDefinition{},
+		InterfaceSegregation{},
+		DependencyInversion{},
 	}
 }

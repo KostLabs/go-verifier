@@ -44,7 +44,7 @@ func checkShadowing(pass *runner.Pass, file *ast.File, info *types.Info, diags *
 
 		for _, lhs := range assign.Lhs {
 			ident, isIdent := lhs.(*ast.Ident)
-			if !isIdent || ident.Name == "_" {
+			if !isIdent || ident.Name == "_" || ident.Name == "err" {
 				continue
 			}
 			obj := info.Defs[ident]

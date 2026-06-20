@@ -1,6 +1,15 @@
 // Package ignore parses //goverifier:ignore directives from Go source files.
-// A directive applies to the next AST node following the comment.
-// Format: //goverifier:ignore:<rule1>,<rule2>  or  //goverifier:ignore  (suppresses all)
+//
+// A directive suppresses findings on the node it annotates. Two placements are
+// supported:
+//
+//   - Preceding line:  the directive appears on the line immediately before the
+//     node (or before the GenDecl / FuncDecl that owns it).
+//   - Inline (same line): the directive appears on the same source line as the
+//     node's opening position.
+//
+// Format: //goverifier:ignore:<rule1>,<rule2> [optional reason text]
+// or:     //goverifier:ignore  (suppresses all rules)
 package ignore
 
 import (
@@ -11,19 +20,26 @@ import (
 
 const prefix = "//goverifier:ignore"
 
-// Set maps token positions to the set of suppressed rule names for that node.
-// The special value "*" means all rules are suppressed.
-type Set map[token.Pos]map[string]struct{}
+// Set holds parsed directives indexed two ways for fast lookup:
+//   - byPos: keyed by the exact token.Pos of the annotated node (preceding-line placement)
+//   - byLine: keyed by source line number (inline placement)
+type Set struct {
+	byPos  map[token.Pos]map[string]struct{}
+	byLine map[int]map[string]struct{}
+	fset   *token.FileSet
+}
 
-// Parse builds an ignore Set from the comments in a file.
-// It associates each directive with the position of the next declaration or
-// statement that follows it in the file.
+// Parse builds a Set from the comments in a file.
 func Parse(fset *token.FileSet, file *ast.File) Set {
-	set := make(Set)
+	set := Set{
+		byPos:  make(map[token.Pos]map[string]struct{}),
+		byLine: make(map[int]map[string]struct{}),
+		fset:   fset,
+	}
 
-	// Collect all directive comments with their end positions.
 	type entry struct {
-		end   token.Pos
+		line  int       // source line the comment is on
+		end   token.Pos // end position of the comment token
 		rules map[string]struct{}
 	}
 	var directives []entry
@@ -37,18 +53,23 @@ func Parse(fset *token.FileSet, file *ast.File) Set {
 			rules := make(map[string]struct{})
 			rest := strings.TrimPrefix(text, prefix)
 			if rest == "" {
-				// //goverifier:ignore — suppress all
 				rules["*"] = struct{}{}
 			} else if after, ok := strings.CutPrefix(rest, ":"); ok {
-				for _, r := range strings.Split(after, ",") {
-					r = strings.TrimSpace(r)
-					if r != "" {
-						rules[r] = struct{}{}
+				// Everything up to the first whitespace is the rule list; the rest
+				// is an optional freetext reason.
+				parts := strings.FieldsFunc(after, func(r rune) bool { return r == ' ' || r == '\t' })
+				if len(parts) > 0 {
+					for _, r := range strings.Split(parts[0], ",") {
+						r = strings.TrimSpace(r)
+						if r != "" {
+							rules[r] = struct{}{}
+						}
 					}
 				}
 			}
 			if len(rules) > 0 {
-				directives = append(directives, entry{end: c.End(), rules: rules})
+				line := fset.Position(c.Pos()).Line
+				directives = append(directives, entry{line: line, end: c.End(), rules: rules})
 			}
 		}
 	}
@@ -57,7 +78,14 @@ func Parse(fset *token.FileSet, file *ast.File) Set {
 		return set
 	}
 
-	// Collect positions of all top-level declarations and their inner nodes.
+	// Index inline directives by their source line so IsSuppressed can match
+	// nodes whose Pos() falls on the same line as the comment.
+	for _, d := range directives {
+		set.byLine[d.line] = d.rules
+	}
+
+	// Index preceding-line directives: associate each directive with the first
+	// node that begins strictly after the comment ends.
 	var nodePositions []token.Pos
 	ast.Inspect(file, func(n ast.Node) bool {
 		if n == nil {
@@ -67,11 +95,10 @@ func Parse(fset *token.FileSet, file *ast.File) Set {
 		return true
 	})
 
-	// For each directive, find the first node that starts after the comment ends.
 	for _, d := range directives {
 		for _, pos := range nodePositions {
 			if pos > d.end {
-				set[pos] = d.rules
+				set.byPos[pos] = d.rules
 				break
 			}
 		}
@@ -81,14 +108,27 @@ func Parse(fset *token.FileSet, file *ast.File) Set {
 }
 
 // IsSuppressed reports whether rule is suppressed at the given position.
+// It matches both preceding-line directives (exact pos lookup) and inline
+// directives (same source line as pos).
 func IsSuppressed(set Set, pos token.Pos, rule string) bool {
-	rules, ok := set[pos]
-	if !ok {
-		return false
+	if rules, ok := set.byPos[pos]; ok {
+		if _, all := rules["*"]; all {
+			return true
+		}
+		if _, found := rules[rule]; found {
+			return true
+		}
 	}
-	if _, all := rules["*"]; all {
-		return true
+	if set.fset != nil {
+		line := set.fset.Position(pos).Line
+		if rules, ok := set.byLine[line]; ok {
+			if _, all := rules["*"]; all {
+				return true
+			}
+			if _, found := rules[rule]; found {
+				return true
+			}
+		}
 	}
-	_, found := rules[rule]
-	return found
+	return false
 }

@@ -47,7 +47,7 @@ func (AnyType) Run(pass *runner.Pass) []report.Diagnostic {
 
 		case *ast.FuncDecl:
 			if ignore.IsSuppressed(pass.IgnoreSet, node.Pos(), "any-type") {
-				return true
+				return false
 			}
 			// Skip exempt function names (marshalling etc.)
 			if exemptFunctions[node.Name.Name] {

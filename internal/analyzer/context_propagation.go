@@ -4,9 +4,9 @@ import (
 	"go/ast"
 	"go/types"
 
-	"goverifier/internal/ignore"
-	"goverifier/internal/report"
-	"goverifier/internal/runner"
+	"github.com/KostLabs/go-verifier/internal/ignore"
+	"github.com/KostLabs/go-verifier/internal/report"
+	"github.com/KostLabs/go-verifier/internal/runner"
 )
 
 // ContextPropagation checks that functions accepting or performing I/O receive

@@ -5,9 +5,9 @@ import (
 	"go/token"
 	"go/types"
 
-	"goverifier/internal/ignore"
-	"goverifier/internal/report"
-	"goverifier/internal/runner"
+	"github.com/KostLabs/go-verifier/internal/ignore"
+	"github.com/KostLabs/go-verifier/internal/report"
+	"github.com/KostLabs/go-verifier/internal/runner"
 )
 
 // VariableShadowing detects variables declared in inner scopes that shadow

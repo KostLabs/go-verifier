@@ -1,4 +1,4 @@
-module goverifier
+module github.com/KostLabs/go-verifier
 
 go 1.26.4
 

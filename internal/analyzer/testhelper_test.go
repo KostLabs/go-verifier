@@ -8,9 +8,9 @@ import (
 	"go/types"
 	"testing"
 
-	"goverifier/internal/ignore"
-	"goverifier/internal/report"
-	"goverifier/internal/runner"
+	"github.com/KostLabs/go-verifier/internal/ignore"
+	"github.com/KostLabs/go-verifier/internal/report"
+	"github.com/KostLabs/go-verifier/internal/runner"
 )
 
 // runAnalyzer parses src as a Go source file in the given package name,

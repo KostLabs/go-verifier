@@ -3,9 +3,9 @@ package analyzer
 import (
 	"go/ast"
 
-	"goverifier/internal/ignore"
-	"goverifier/internal/report"
-	"goverifier/internal/runner"
+	"github.com/KostLabs/go-verifier/internal/ignore"
+	"github.com/KostLabs/go-verifier/internal/report"
+	"github.com/KostLabs/go-verifier/internal/runner"
 )
 
 // DeferInLoop checks for defer statements inside for/range loop bodies.

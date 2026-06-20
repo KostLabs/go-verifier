@@ -6,9 +6,9 @@ import (
 	"os"
 	"strings"
 
-	"goverifier/internal/analyzer"
-	"goverifier/internal/report"
-	"goverifier/internal/runner"
+	"github.com/KostLabs/go-verifier/internal/analyzer"
+	"github.com/KostLabs/go-verifier/internal/report"
+	"github.com/KostLabs/go-verifier/internal/runner"
 )
 
 const usage = `go-verifier: enforce KLabs Go practices

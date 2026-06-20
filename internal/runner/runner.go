@@ -8,8 +8,8 @@ import (
 
 	"golang.org/x/tools/go/packages"
 
-	"goverifier/internal/ignore"
-	"goverifier/internal/report"
+	"github.com/KostLabs/go-verifier/internal/ignore"
+	"github.com/KostLabs/go-verifier/internal/report"
 )
 
 // Analyzer is the interface every rule checker implements.

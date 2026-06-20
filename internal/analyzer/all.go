@@ -1,7 +1,7 @@
 // Package analyzer contains all goverifier rule implementations.
 package analyzer
 
-import "goverifier/internal/runner"
+import "github.com/KostLabs/go-verifier/internal/runner"
 
 // All returns every built-in analyzer.
 func All() []runner.Analyzer {

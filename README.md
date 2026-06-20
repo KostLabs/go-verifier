@@ -5,7 +5,7 @@ A static analysis tool that enforces [KLabs Go coding practices](https://practic
 ## Installation
 
 ```bash
-go install goverifier/cmd/goverifier@latest
+go install github.com/KostLabs/go-verifier/cmd/goverifier@latest
 ```
 
 Or build from source:

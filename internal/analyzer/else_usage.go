@@ -4,9 +4,9 @@ import (
 	"go/ast"
 	"go/token"
 
-	"goverifier/internal/ignore"
-	"goverifier/internal/report"
-	"goverifier/internal/runner"
+	"github.com/KostLabs/go-verifier/internal/ignore"
+	"github.com/KostLabs/go-verifier/internal/report"
+	"github.com/KostLabs/go-verifier/internal/runner"
 )
 
 // ElseUsage flags else blocks that follow an if-body that unconditionally

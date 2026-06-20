@@ -4,9 +4,9 @@ import (
 	"go/ast"
 	"strings"
 
-	"goverifier/internal/ignore"
-	"goverifier/internal/report"
-	"goverifier/internal/runner"
+	"github.com/KostLabs/go-verifier/internal/ignore"
+	"github.com/KostLabs/go-verifier/internal/report"
+	"github.com/KostLabs/go-verifier/internal/runner"
 )
 
 // Logging checks for bare fmt.Println / fmt.Printf / log.Print* calls in

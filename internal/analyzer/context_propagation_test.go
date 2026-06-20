@@ -69,6 +69,31 @@ func Add(a, b int) int {
 			wantRules: nil,
 		},
 		{
+			name:  "framework context type as first param is not flagged",
+			given: "a handler whose first param is a custom type that implements context.Context (e.g. *gin.Context)",
+			// To not add deps in go.mod, we define a local FrameworkCtx that structurally implements context.Context.
+			src: `package p
+import (
+	"context"
+	"time"
+)
+// FrameworkCtx simulates *gin.Context: implements context.Context structurally.
+type FrameworkCtx struct{}
+func (f *FrameworkCtx) Deadline() (time.Time, bool)     { return time.Time{}, false }
+func (f *FrameworkCtx) Done() <-chan struct{}             { return nil }
+func (f *FrameworkCtx) Err() error                       { return nil }
+func (f *FrameworkCtx) Value(key any) any                { return nil }
+func (f *FrameworkCtx) StdCtx() context.Context          { return context.Background() }
+
+type Service struct{}
+func (s *Service) GetAll(ctx context.Context) error { return nil }
+
+func GetAll(ctx *FrameworkCtx) {
+	_ = (&Service{}).GetAll(ctx.StdCtx())
+}`,
+			wantRules: nil,
+		},
+		{
 			name:  "ignore directive suppresses the finding",
 			given: "a context-propagation violation suppressed by //goverifier:ignore",
 			src: `package p

@@ -56,7 +56,7 @@ func (ContextPropagation) Run(pass *runner.Pass) []report.Diagnostic {
 	return diags
 }
 
-// isContextType reports whether expr resolves to context.Context.
+// isContextType reports whether expr resolves to a type that implements context.Context.
 func isContextType(info *types.Info, expr ast.Expr) bool {
 	if info == nil {
 		return false
@@ -65,12 +65,28 @@ func isContextType(info *types.Info, expr ast.Expr) bool {
 	if t == nil {
 		return false
 	}
-	named, ok := t.(*types.Named)
-	if !ok {
-		return false
+	return implementsContext(t)
+}
+
+// implementsContext reports whether t implements context.Context, either by
+// being context.Context itself or by satisfying its method set (e.g. *gin.Context).
+func implementsContext(t types.Type) bool {
+	// Check for the exact context.Context named type.
+	if named, ok := t.(*types.Named); ok {
+		obj := named.Obj()
+		if obj.Pkg() != nil && obj.Pkg().Path() == "context" && obj.Name() == "Context" {
+			return true
+		}
 	}
-	obj := named.Obj()
-	return obj.Pkg() != nil && obj.Pkg().Path() == "context" && obj.Name() == "Context"
+	// Check structural implementation: must have Deadline, Done, Err, Value methods.
+	ms := types.NewMethodSet(t)
+	required := []string{"Deadline", "Done", "Err", "Value"}
+	for _, name := range required {
+		if ms.Lookup(nil, name) == nil {
+			return false
+		}
+	}
+	return true
 }
 
 // funcNeedsContext is a heuristic: a function needs context if any of its
@@ -93,14 +109,9 @@ func funcNeedsContext(info *types.Info, fn *ast.FuncDecl) bool {
 		for _, arg := range call.Args {
 			if info != nil {
 				t := info.TypeOf(arg)
-				if t != nil {
-					if named, ok2 := t.(*types.Named); ok2 {
-						obj := named.Obj()
-						if obj.Pkg() != nil && obj.Pkg().Path() == "context" && obj.Name() == "Context" {
-							found = true
-							return false
-						}
-					}
+				if t != nil && implementsContext(t) {
+					found = true
+					return false
 				}
 			}
 		}
@@ -127,12 +138,9 @@ func funcNeedsContext(info *types.Info, fn *ast.FuncDecl) bool {
 			}
 			if fnType != nil && fnType.Params().Len() > 0 {
 				first := fnType.Params().At(0)
-				if named, ok2 := first.Type().(*types.Named); ok2 {
-					obj := named.Obj()
-					if obj.Pkg() != nil && obj.Pkg().Path() == "context" && obj.Name() == "Context" {
-						found = true
-						return false
-					}
+				if implementsContext(first.Type()) {
+					found = true
+					return false
 				}
 			}
 		}

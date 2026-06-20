@@ -103,13 +103,6 @@ func funcNeedsContext(info *types.Info, fn *ast.FuncDecl) bool {
 					}
 				}
 			}
-			// Fallback: check if the ident is named "ctx" or "context".
-			if ident, ok2 := arg.(*ast.Ident); ok2 {
-				if ident.Name == "ctx" || ident.Name == "context" {
-					found = true
-					return false
-				}
-			}
 		}
 		// If the first arg type of the callee is context.Context, we should propagate.
 		if info != nil {

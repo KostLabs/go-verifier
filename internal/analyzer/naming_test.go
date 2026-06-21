@@ -104,6 +104,99 @@ type IUserRepository interface {
 }`,
 			wantRules: nil,
 		},
+		{
+			name:    "single-letter function parameter is flagged",
+			given:   "a function parameter named s",
+			pkgName: "p",
+			src: `package p
+func Process(s string) {}`,
+			wantRules: []string{"naming"},
+		},
+		{
+			name:    "single-letter receiver name is flagged",
+			given:   "a method receiver named s",
+			pkgName: "p",
+			src: `package p
+type Server struct{}
+func (s *Server) Start() {}`,
+			wantRules: []string{"naming"},
+		},
+		{
+			name:    "single-letter local variable is flagged",
+			given:   "a short variable declaration with name n",
+			pkgName: "p",
+			src: `package p
+func Process() {
+	n := 42
+	_ = n
+}`,
+			wantRules: []string{"naming"},
+		},
+		{
+			name:    "single-letter named return is flagged",
+			given:   "a named return value with name n",
+			pkgName: "p",
+			src: `package p
+func Process() (n int) {
+	return
+}`,
+			wantRules: []string{"naming"},
+		},
+		{
+			name:    "loop index i in classic for loop is allowed",
+			given:   "a classic for loop with index i",
+			pkgName: "p",
+			src: `package p
+func Process() {
+	for i := 0; i < 10; i++ {
+		_ = i
+	}
+}`,
+			wantRules: nil,
+		},
+		{
+			name:    "loop index i in range loop is allowed",
+			given:   "a range loop with index i",
+			pkgName: "p",
+			src: `package p
+func Process(items []string) {
+	for i, v := range items {
+		_ = i
+		_ = v
+	}
+}`,
+			wantRules: nil,
+		},
+		{
+			name:    "blank identifier is always allowed",
+			given:   "an assignment using _",
+			pkgName: "p",
+			src: `package p
+func Process() {
+	_ = 42
+}`,
+			wantRules: nil,
+		},
+		{
+			name:    "descriptive variable name is not flagged",
+			given:   "a local variable named count",
+			pkgName: "p",
+			src: `package p
+func Process() {
+	count := 42
+	_ = count
+}`,
+			wantRules: nil,
+		},
+		{
+			name:    "ignore directive suppresses short name finding",
+			given:   "a single-letter parameter with an ignore directive",
+			pkgName: "p",
+			src: `package p
+//goverifier:ignore:naming
+func Process(s string) {}`,
+			wantRules: nil,
+		},
 	}
 
 	for _, tc := range tests {

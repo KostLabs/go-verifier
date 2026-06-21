@@ -65,6 +65,24 @@ func DoSomething(client *http.Client) {}`,
 			wantRules: nil,
 		},
 		{
+			name: "exported struct field with same-package concrete type is not flagged",
+			src: `package p
+type Config struct{}
+type Server struct {
+	Cfg Config
+}`,
+			wantRules: nil,
+		},
+		{
+			name: "constructor accepting same-package concrete type is not flagged",
+			src: `package p
+type Config struct{}
+func NewServer(cfg Config) *Config {
+	return &cfg
+}`,
+			wantRules: nil,
+		},
+		{
 			name: "ignore directive on constructor suppresses the finding",
 			src: `package p
 import "net/http"

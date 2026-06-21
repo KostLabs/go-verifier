@@ -61,7 +61,7 @@ func checkStructFields(pass *runner.Pass, ts *ast.TypeSpec, diags *[]report.Diag
 		if ignore.IsSuppressed(pass.IgnoreSet, field.Pos(), "dependency-inversion") {
 			continue
 		}
-		if isConcreteDependency(pass.TypesInfo, field.Type) {
+		if isConcreteDependency(pass.TypesInfo, pass.Pkg, field.Type) {
 			name := "<embedded>"
 			if len(field.Names) > 0 {
 				name = field.Names[0].Name
@@ -91,7 +91,7 @@ func checkConstructorParams(pass *runner.Pass, fn *ast.FuncDecl, diags *[]report
 	}
 
 	for _, param := range fn.Type.Params.List {
-		if isConcreteDependency(pass.TypesInfo, param.Type) {
+		if isConcreteDependency(pass.TypesInfo, pass.Pkg, param.Type) {
 			name := "_"
 			if len(param.Names) > 0 {
 				name = param.Names[0].Name
@@ -107,25 +107,30 @@ func checkConstructorParams(pass *runner.Pass, fn *ast.FuncDecl, diags *[]report
 
 // isConcreteDependency reports whether expr is a concrete struct or pointer-to-struct
 // type from an external package (not a primitive, interface, or same-package type).
-func isConcreteDependency(info *types.Info, expr ast.Expr) bool {
+func isConcreteDependency(info *types.Info, currentPkg *types.Package, expr ast.Expr) bool {
 	t := info.TypeOf(expr)
 	if t == nil {
 		return false
 	}
-	return isConcreteExternalType(t)
+	return isConcreteExternalType(t, currentPkg)
 }
 
-func isConcreteExternalType(t types.Type) bool {
+func isConcreteExternalType(t types.Type, currentPkg *types.Package) bool {
 	switch typ := t.(type) {
 	case *types.Pointer:
-		return isConcreteExternalType(typ.Elem())
+		return isConcreteExternalType(typ.Elem(), currentPkg)
 	case *types.Named:
 		obj := typ.Obj()
 		if obj.Pkg() == nil {
 			// Universe type (builtin).
 			return false
 		}
-		// Must be from an external package (not stdlib builtins handled above).
+
+		// Same-package types are not cross-package dependencies — skip.
+		if currentPkg != nil && obj.Pkg() == currentPkg {
+			return false
+		}
+
 		// Check underlying is a struct, not an interface.
 		switch typ.Underlying().(type) {
 		case *types.Struct:

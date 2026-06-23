@@ -2,7 +2,6 @@ package analyzer
 
 import (
 	"go/ast"
-	"go/token"
 	"go/types"
 
 	"github.com/KostLabs/go-verifier/internal/ignore"
@@ -29,9 +28,6 @@ func (InterfaceDefinition) Run(pass *runner.Pass) []report.Diagnostic {
 
 	var diags []report.Diagnostic
 
-	// Collect interfaces and structs declared in this file.
-	_ = token.NoPos // used via pass.Fset.Position
-
 	type ifaceEntry struct {
 		name  string
 		iface *types.Interface
@@ -54,17 +50,16 @@ func (InterfaceDefinition) Run(pass *runner.Pass) []report.Diagnostic {
 		if !ok {
 			return true
 		}
-		switch t := named.Underlying().(type) {
+		switch underlying := named.Underlying().(type) {
 		case *types.Interface:
 			if !ignore.IsSuppressed(pass.IgnoreSet, ts.Pos(), "interface-definition") {
 				ifaces = append(ifaces, ifaceEntry{
 					name:  ts.Name.Name,
-					iface: t,
+					iface: underlying,
 					node:  ts,
 				})
 			}
 		case *types.Struct:
-			_ = t
 			structTypes = append(structTypes, named)
 		}
 		return true

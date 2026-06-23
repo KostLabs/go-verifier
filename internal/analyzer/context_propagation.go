@@ -34,8 +34,7 @@ func (ContextPropagation) Run(pass *runner.Pass) []report.Diagnostic {
 		}
 
 		// Check if the function already has context as first param.
-		first := params[0]
-		if isContextType(pass.TypesInfo, first.Type) {
+		if isContextType(pass.TypesInfo, params[0].Type) {
 			return true
 		}
 
@@ -61,25 +60,23 @@ func isContextType(info *types.Info, expr ast.Expr) bool {
 	if info == nil {
 		return false
 	}
-	t := info.TypeOf(expr)
-	if t == nil {
-		return false
+	if typ := info.TypeOf(expr); typ != nil {
+		return implementsContext(typ)
 	}
-	return implementsContext(t)
+	return false
 }
 
-// implementsContext reports whether t implements context.Context, either by
+// implementsContext reports whether typ implements context.Context, either by
 // being context.Context itself or by satisfying its method set (e.g. *gin.Context).
-func implementsContext(t types.Type) bool {
+func implementsContext(typ types.Type) bool {
 	// Check for the exact context.Context named type.
-	if named, ok := t.(*types.Named); ok {
-		obj := named.Obj()
-		if obj.Pkg() != nil && obj.Pkg().Path() == "context" && obj.Name() == "Context" {
+	if named, ok := typ.(*types.Named); ok {
+		if obj := named.Obj(); obj.Pkg() != nil && obj.Pkg().Path() == "context" && obj.Name() == "Context" {
 			return true
 		}
 	}
 	// Check structural implementation: must have Deadline, Done, Err, Value methods.
-	ms := types.NewMethodSet(t)
+	ms := types.NewMethodSet(typ)
 	required := []string{"Deadline", "Done", "Err", "Value"}
 	for _, name := range required {
 		if ms.Lookup(nil, name) == nil {
@@ -105,46 +102,43 @@ func funcNeedsContext(info *types.Info, fn *ast.FuncDecl) bool {
 		if !ok {
 			return true
 		}
-		// If any argument to a call is a context, the caller should accept one.
+		if info == nil {
+			return true
+		}
 		for _, arg := range call.Args {
-			if info != nil {
-				t := info.TypeOf(arg)
-				if t != nil && implementsContext(t) {
-					found = true
-					return false
-				}
+			if typ := info.TypeOf(arg); typ != nil && implementsContext(typ) {
+				found = true
+				return false
 			}
 		}
-		// If the first arg type of the callee is context.Context, we should propagate.
-		if info != nil {
-			var fnType *types.Signature
-			switch f := call.Fun.(type) {
-			case *ast.Ident:
-				if obj := info.ObjectOf(f); obj != nil {
-					if sig, ok2 := obj.Type().(*types.Signature); ok2 {
-						fnType = sig
-					}
-				}
-			case *ast.SelectorExpr:
-				if sel := info.Selections[f]; sel != nil {
-					if sig, ok2 := sel.Type().(*types.Signature); ok2 {
-						fnType = sig
-					}
-				} else if obj := info.ObjectOf(f.Sel); obj != nil {
-					if sig, ok2 := obj.Type().(*types.Signature); ok2 {
-						fnType = sig
-					}
-				}
-			}
-			if fnType != nil && fnType.Params().Len() > 0 {
-				first := fnType.Params().At(0)
-				if implementsContext(first.Type()) {
-					found = true
-					return false
-				}
+		if sig := calleeSignature(info, call); sig != nil && sig.Params().Len() > 0 {
+			if implementsContext(sig.Params().At(0).Type()) {
+				found = true
+				return false
 			}
 		}
 		return true
 	})
 	return found
+}
+
+// calleeSignature returns the *types.Signature for the function being called, if resolvable.
+func calleeSignature(info *types.Info, call *ast.CallExpr) *types.Signature {
+	switch fn := call.Fun.(type) {
+	case *ast.Ident:
+		if obj := info.ObjectOf(fn); obj != nil {
+			sig, _ := obj.Type().(*types.Signature)
+			return sig
+		}
+	case *ast.SelectorExpr:
+		if sel := info.Selections[fn]; sel != nil {
+			sig, _ := sel.Type().(*types.Signature)
+			return sig
+		}
+		if obj := info.ObjectOf(fn.Sel); obj != nil {
+			sig, _ := obj.Type().(*types.Signature)
+			return sig
+		}
+	}
+	return nil
 }

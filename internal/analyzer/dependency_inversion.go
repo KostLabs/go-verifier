@@ -108,19 +108,19 @@ func checkConstructorParams(pass *runner.Pass, fn *ast.FuncDecl, diags *[]report
 // isConcreteDependency reports whether expr is a concrete struct or pointer-to-struct
 // type from an external package (not a primitive, interface, or same-package type).
 func isConcreteDependency(info *types.Info, currentPkg *types.Package, expr ast.Expr) bool {
-	t := info.TypeOf(expr)
-	if t == nil {
+	typ := info.TypeOf(expr)
+	if typ == nil {
 		return false
 	}
-	return isConcreteExternalType(t, currentPkg)
+	return isConcreteExternalType(typ, currentPkg)
 }
 
-func isConcreteExternalType(t types.Type, currentPkg *types.Package) bool {
-	switch typ := t.(type) {
+func isConcreteExternalType(typ types.Type, currentPkg *types.Package) bool {
+	switch concrete := typ.(type) {
 	case *types.Pointer:
-		return isConcreteExternalType(typ.Elem(), currentPkg)
+		return isConcreteExternalType(concrete.Elem(), currentPkg)
 	case *types.Named:
-		obj := typ.Obj()
+		obj := concrete.Obj()
 		if obj.Pkg() == nil {
 			// Universe type (builtin).
 			return false
@@ -132,7 +132,7 @@ func isConcreteExternalType(t types.Type, currentPkg *types.Package) bool {
 		}
 
 		// Check underlying is a struct, not an interface.
-		switch typ.Underlying().(type) {
+		switch concrete.Underlying().(type) {
 		case *types.Struct:
 			return true
 		case *types.Interface:

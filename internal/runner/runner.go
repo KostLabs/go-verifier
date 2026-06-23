@@ -37,12 +37,12 @@ type Config struct {
 	Disabled  map[string]bool
 }
 
-func (c *Config) active(name string) bool {
-	if len(c.Disabled) > 0 && c.Disabled[name] {
+func (cfg *Config) active(name string) bool {
+	if len(cfg.Disabled) > 0 && cfg.Disabled[name] {
 		return false
 	}
-	if len(c.Enabled) > 0 {
-		return c.Enabled[name]
+	if len(cfg.Enabled) > 0 {
+		return cfg.Enabled[name]
 	}
 	return true
 }

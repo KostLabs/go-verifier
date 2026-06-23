@@ -2,7 +2,6 @@ package analyzer
 
 import (
 	"go/ast"
-	"go/token"
 	"go/types"
 	"strings"
 
@@ -49,8 +48,9 @@ func checkPanic(pass *runner.Pass, call *ast.CallExpr, isTest bool, diags *[]rep
 	if isTest {
 		return
 	}
-	ident, ok := call.Fun.(*ast.Ident)
-	if !ok || ident.Name != "panic" {
+	//goverifier:ignore:if-shorthand
+	ident, isIdent := call.Fun.(*ast.Ident)
+	if !isIdent || ident.Name != "panic" {
 		return
 	}
 	// Allow panic(err) where err is a builtin — e.g. panic("unreachable") in truly
@@ -69,6 +69,7 @@ func checkErrorfWrapping(pass *runner.Pass, call *ast.CallExpr, diags *[]report.
 	if !ok || sel.Sel.Name != "Errorf" {
 		return
 	}
+	//goverifier:ignore:if-shorthand
 	pkg, ok := sel.X.(*ast.Ident)
 	if !ok || pkg.Name != "fmt" {
 		return
@@ -77,14 +78,11 @@ func checkErrorfWrapping(pass *runner.Pass, call *ast.CallExpr, diags *[]report.
 		return
 	}
 	// First arg must be a format string literal containing %w if wrapping an error.
-	lit, ok := call.Args[0].(*ast.BasicLit)
-	if !ok {
+	lit, isLit := call.Args[0].(*ast.BasicLit)
+	if !isLit {
 		return
 	}
-	format := strings.Trim(lit.Value, `"`)
-
-	// If there's an error argument but the format uses %v or %s instead of %w, flag it.
-	if hasErrorArg(pass, call) && !strings.Contains(format, "%w") {
+	if format := strings.Trim(lit.Value, `"`); hasErrorArg(pass, call) && !strings.Contains(format, "%w") {
 		*diags = append(*diags, report.Diagnostic{
 			Pos:     pass.Fset.Position(call.Pos()),
 			Rule:    "error-handling",
@@ -100,8 +98,7 @@ func hasErrorArg(pass *runner.Pass, call *ast.CallExpr) bool {
 	}
 	errorType := types.Universe.Lookup("error").Type()
 	for _, arg := range call.Args[1:] {
-		t := pass.TypesInfo.TypeOf(arg)
-		if t != nil && types.Implements(t, errorType.Underlying().(*types.Interface)) {
+		if typ := pass.TypesInfo.TypeOf(arg); typ != nil && types.Implements(typ, errorType.Underlying().(*types.Interface)) {
 			return true
 		}
 	}
@@ -127,11 +124,11 @@ func checkErrorLastReturn(pass *runner.Pass, fn *ast.FuncDecl, diags *[]report.D
 		if pass.TypesInfo == nil {
 			continue
 		}
-		t := pass.TypesInfo.TypeOf(field.Type)
-		if t == nil {
+		typ := pass.TypesInfo.TypeOf(field.Type)
+		if typ == nil {
 			continue
 		}
-		if types.Identical(t, errorType) {
+		if types.Identical(typ, errorType) {
 			*diags = append(*diags, report.Diagnostic{
 				Pos:     pass.Fset.Position(fn.Pos()),
 				Rule:    "error-handling",
@@ -141,8 +138,4 @@ func checkErrorLastReturn(pass *runner.Pass, fn *ast.FuncDecl, diags *[]report.D
 			return
 		}
 	}
-
-	// Also check that the last return value isn't non-error while there's an
-	// error somewhere non-last — already handled above.
-	_ = token.NoPos
 }

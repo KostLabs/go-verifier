@@ -18,5 +18,6 @@ func All() []runner.Analyzer {
 		InterfaceDefinition{},
 		InterfaceSegregation{},
 		DependencyInversion{},
+		IfShorthand{},
 	}
 }

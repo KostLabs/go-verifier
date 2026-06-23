@@ -2,7 +2,6 @@ package analyzer
 
 import (
 	"go/ast"
-	"go/token"
 
 	"github.com/KostLabs/go-verifier/internal/ignore"
 	"github.com/KostLabs/go-verifier/internal/report"
@@ -43,18 +42,17 @@ func (ElseUsage) Run(pass *runner.Pass) []report.Diagnostic {
 	return diags
 }
 
-// blockAlwaysExits reports whether every code path in b ends with an
+// blockAlwaysExits reports whether every code path in block ends with an
 // unconditional exit (return, panic, continue, break, goto).
-func blockAlwaysExits(b *ast.BlockStmt) bool {
-	if b == nil || len(b.List) == 0 {
+func blockAlwaysExits(block *ast.BlockStmt) bool {
+	if block == nil || len(block.List) == 0 {
 		return false
 	}
-	return stmtAlwaysExits(b.List[len(b.List)-1])
+	return stmtAlwaysExits(block.List[len(block.List)-1])
 }
 
-func stmtAlwaysExits(s ast.Stmt) bool {
-	_ = token.NoPos
-	switch v := s.(type) {
+func stmtAlwaysExits(stmt ast.Stmt) bool {
+	switch node := stmt.(type) {
 	case *ast.ReturnStmt:
 		return true
 	case *ast.BranchStmt:
@@ -62,22 +60,22 @@ func stmtAlwaysExits(s ast.Stmt) bool {
 		return true
 	case *ast.ExprStmt:
 		// panic(...)
-		call, ok := v.X.(*ast.CallExpr)
+		call, ok := node.X.(*ast.CallExpr)
 		if !ok {
 			return false
 		}
 		ident, ok := call.Fun.(*ast.Ident)
 		return ok && ident.Name == "panic"
 	case *ast.BlockStmt:
-		return blockAlwaysExits(v)
+		return blockAlwaysExits(node)
 	case *ast.IfStmt:
 		// An if/else where both branches exit always exits.
-		if v.Else == nil {
+		if node.Else == nil {
 			return false
 		}
-		return blockAlwaysExits(v.Body) && stmtAlwaysExits(v.Else)
+		return blockAlwaysExits(node.Body) && stmtAlwaysExits(node.Else)
 	case *ast.SwitchStmt:
-		return switchAlwaysExits(v)
+		return switchAlwaysExits(node)
 	}
 	return false
 }

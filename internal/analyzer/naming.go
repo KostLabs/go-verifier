@@ -34,6 +34,7 @@ func (Naming) Run(pass *runner.Pass) []report.Diagnostic {
 	var diags []report.Diagnostic
 
 	// Package name check — once per file is fine, deduplicate via position.
+	//goverifier:ignore:if-shorthand
 	pkgName := pass.File.Name.Name
 	if genericPackageNames[pkgName] {
 		if !ignore.IsSuppressed(pass.IgnoreSet, pass.File.Name.Pos(), "naming") {
@@ -62,8 +63,8 @@ func (Naming) Run(pass *runner.Pass) []report.Diagnostic {
 					if !ok {
 						continue
 					}
-					if iface, ok2 := ts.Type.(*ast.InterfaceType); ok2 {
-						checkInterfaceName(pass, ts.Name, iface, &diags)
+					if _, ok2 := ts.Type.(*ast.InterfaceType); ok2 {
+						checkInterfaceName(pass, ts.Name, &diags)
 					}
 				}
 			case "const":
@@ -109,7 +110,7 @@ func collectLoopIndexPositions(file *ast.File) map[token.Pos]bool {
 			// Classic for i := 0; i < n; i++
 			if assign, ok := node.Init.(*ast.AssignStmt); ok && assign.Tok == token.DEFINE {
 				for _, lhs := range assign.Lhs {
-					if ident, ok := lhs.(*ast.Ident); ok {
+					if ident, isIdent := lhs.(*ast.Ident); isIdent {
 						positions[ident.Pos()] = true
 					}
 				}
@@ -117,12 +118,12 @@ func collectLoopIndexPositions(file *ast.File) map[token.Pos]bool {
 		case *ast.RangeStmt:
 			// for i, v := range ...
 			if node.Key != nil {
-				if ident, ok := node.Key.(*ast.Ident); ok {
+				if ident, isIdent := node.Key.(*ast.Ident); isIdent {
 					positions[ident.Pos()] = true
 				}
 			}
 			if node.Value != nil {
-				if ident, ok := node.Value.(*ast.Ident); ok {
+				if ident, isIdent := node.Value.(*ast.Ident); isIdent {
 					positions[ident.Pos()] = true
 				}
 			}
@@ -137,23 +138,11 @@ func checkFuncNames(pass *runner.Pass, fn *ast.FuncDecl, loopIndexPos map[token.
 	if ignore.IsSuppressed(pass.IgnoreSet, fn.Pos(), "naming") {
 		return
 	}
-	// Receiver names.
-	if fn.Recv != nil {
-		for _, field := range fn.Recv.List {
-			for _, name := range field.Names {
-				checkShortName(pass, name, loopIndexPos, diags)
-			}
+	for _, fl := range []*ast.FieldList{fn.Recv, fn.Type.Params, fn.Type.Results} {
+		if fl == nil {
+			continue
 		}
-	}
-	if fn.Type.Params != nil {
-		for _, field := range fn.Type.Params.List {
-			for _, name := range field.Names {
-				checkShortName(pass, name, loopIndexPos, diags)
-			}
-		}
-	}
-	if fn.Type.Results != nil {
-		for _, field := range fn.Type.Results.List {
+		for _, field := range fl.List {
 			for _, name := range field.Names {
 				checkShortName(pass, name, loopIndexPos, diags)
 			}
@@ -177,8 +166,8 @@ func checkAssignNames(pass *runner.Pass, assign *ast.AssignStmt, loopIndexPos ma
 
 // checkShortName flags a single-letter identifier that is not _, not a loop index.
 func checkShortName(pass *runner.Pass, name *ast.Ident, loopIndexPos map[token.Pos]bool, diags *[]report.Diagnostic) {
-	n := name.Name
-	if n == "_" || len([]rune(n)) != 1 {
+	raw := name.Name
+	if raw == "_" || len([]rune(raw)) != 1 {
 		return
 	}
 	if loopIndexPos[name.Pos()] {
@@ -190,28 +179,29 @@ func checkShortName(pass *runner.Pass, name *ast.Ident, loopIndexPos map[token.P
 	*diags = append(*diags, report.Diagnostic{
 		Pos:     pass.Fset.Position(name.Pos()),
 		Rule:    "naming",
-		Message: "variable name \"" + n + "\" is too short; use a descriptive name",
+		Message: "variable name \"" + raw + "\" is too short; use a descriptive name",
 	})
 }
 
-func checkInterfaceName(pass *runner.Pass, name *ast.Ident, _ *ast.InterfaceType, diags *[]report.Diagnostic) {
-	n := name.Name
+func checkInterfaceName(pass *runner.Pass, name *ast.Ident, diags *[]report.Diagnostic) {
+	//goverifier:ignore:if-shorthand
+	raw := name.Name
 	// Flag names like IUser, IUserRepository — capital I followed by capital letter.
-	if len(n) >= 2 && n[0] == 'I' && unicode.IsUpper(rune(n[1])) {
+	if len(raw) >= 2 && raw[0] == 'I' && unicode.IsUpper(rune(raw[1])) {
 		*diags = append(*diags, report.Diagnostic{
 			Pos:     pass.Fset.Position(name.Pos()),
 			Rule:    "naming",
-			Message: "interface \"" + n + "\" should not be prefixed with I; use a descriptive noun or -er suffix",
+			Message: "interface \"" + raw + "\" should not be prefixed with I; use a descriptive noun or -er suffix",
 		})
 	}
 }
 
 // isUpperSnakeCase returns true for names like FOO_BAR or MAX_SIZE.
-func isUpperSnakeCase(s string) bool {
-	if !strings.Contains(s, "_") {
+func isUpperSnakeCase(str string) bool {
+	if !strings.Contains(str, "_") {
 		return false
 	}
-	for _, r := range s {
+	for _, r := range str {
 		if r == '_' {
 			continue
 		}
@@ -223,7 +213,6 @@ func isUpperSnakeCase(s string) bool {
 }
 
 func checkConstantName(pass *runner.Pass, name *ast.Ident, diags *[]report.Diagnostic) {
-	_ = token.NoPos
 	if isUpperSnakeCase(name.Name) {
 		*diags = append(*diags, report.Diagnostic{
 			Pos:     pass.Fset.Position(name.Pos()),

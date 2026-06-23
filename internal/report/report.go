@@ -10,6 +10,7 @@ import (
 )
 
 // Diagnostic is a single finding from an analyzer.
+//goverifier:ignore:dependency-inversion
 type Diagnostic struct {
 	Pos     token.Position
 	Rule    string
@@ -24,32 +25,31 @@ const (
 	FormatJSON Format = "json"
 )
 
-// Write prints diagnostics to w in the chosen format.
-func Write(w io.Writer, diags []Diagnostic, fmt_ Format) error {
+// Write prints diagnostics to writer in the chosen format.
+func Write(writer io.Writer, diags []Diagnostic, format Format) error {
 	sort.Slice(diags, func(i, j int) bool {
-		a, b := diags[i], diags[j]
-		if a.Pos.Filename != b.Pos.Filename {
-			return a.Pos.Filename < b.Pos.Filename
+		left, right := diags[i], diags[j]
+		if left.Pos.Filename != right.Pos.Filename {
+			return left.Pos.Filename < right.Pos.Filename
 		}
-		if a.Pos.Line != b.Pos.Line {
-			return a.Pos.Line < b.Pos.Line
+		if left.Pos.Line != right.Pos.Line {
+			return left.Pos.Line < right.Pos.Line
 		}
-		return a.Pos.Column < b.Pos.Column
+		return left.Pos.Column < right.Pos.Column
 	})
 
-	switch fmt_ {
+	switch format {
 	case FormatJSON:
-		return writeJSON(w, diags)
+		return writeJSON(writer, diags)
 	default:
-		return writeText(w, diags)
+		return writeText(writer, diags)
 	}
 }
 
-func writeText(w io.Writer, diags []Diagnostic) error {
-	for _, d := range diags {
-		_, err := fmt.Fprintf(w, "%s:%d:%d: [%s] %s\n",
-			d.Pos.Filename, d.Pos.Line, d.Pos.Column, d.Rule, d.Message)
-		if err != nil {
+func writeText(writer io.Writer, diags []Diagnostic) error {
+	for _, diag := range diags {
+		if _, err := fmt.Fprintf(writer, "%s:%d:%d: [%s] %s\n",
+			diag.Pos.Filename, diag.Pos.Line, diag.Pos.Column, diag.Rule, diag.Message); err != nil {
 			return err
 		}
 	}
@@ -64,18 +64,18 @@ type jsonDiagnostic struct {
 	Message string `json:"message"`
 }
 
-func writeJSON(w io.Writer, diags []Diagnostic) error {
+func writeJSON(writer io.Writer, diags []Diagnostic) error {
 	out := make([]jsonDiagnostic, len(diags))
-	for i, d := range diags {
+	for i, diag := range diags {
 		out[i] = jsonDiagnostic{
-			File:    d.Pos.Filename,
-			Line:    d.Pos.Line,
-			Column:  d.Pos.Column,
-			Rule:    d.Rule,
-			Message: d.Message,
+			File:    diag.Pos.Filename,
+			Line:    diag.Pos.Line,
+			Column:  diag.Pos.Column,
+			Rule:    diag.Rule,
+			Message: diag.Message,
 		}
 	}
-	enc := json.NewEncoder(w)
+	enc := json.NewEncoder(writer)
 	enc.SetIndent("", "  ")
 	return enc.Encode(out)
 }

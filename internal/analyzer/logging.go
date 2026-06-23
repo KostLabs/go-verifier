@@ -36,8 +36,7 @@ var bannedCalls = map[string]map[string]bool{
 }
 
 func (Logging) Run(pass *runner.Pass) []report.Diagnostic {
-	filename := pass.Fset.File(pass.File.Pos()).Name()
-	if strings.HasSuffix(filename, "_test.go") {
+	if strings.HasSuffix(pass.Fset.File(pass.File.Pos()).Name(), "_test.go") {
 		return nil
 	}
 

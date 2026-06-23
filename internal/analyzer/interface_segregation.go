@@ -34,12 +34,12 @@ func (InterfaceSegregation) Run(pass *runner.Pass) []report.Diagnostic {
 		}
 
 		for _, spec := range gd.Specs {
-			ts, ok := spec.(*ast.TypeSpec)
-			if !ok {
+			ts, isTypeSpec := spec.(*ast.TypeSpec)
+			if !isTypeSpec {
 				continue
 			}
-			iface, ok := ts.Type.(*ast.InterfaceType)
-			if !ok {
+			iface, isIface := ts.Type.(*ast.InterfaceType)
+			if !isIface {
 				continue
 			}
 			if ignore.IsSuppressed(pass.IgnoreSet, ts.Pos(), "interface-segregation") {

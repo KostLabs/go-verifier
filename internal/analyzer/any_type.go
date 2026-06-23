@@ -74,11 +74,11 @@ func (AnyType) Run(pass *runner.Pass) []report.Diagnostic {
 
 // isAnyType returns true for the `any` ident and bare empty interface{}.
 func isAnyType(expr ast.Expr) bool {
-	switch e := expr.(type) {
+	switch node := expr.(type) {
 	case *ast.Ident:
-		return e.Name == "any"
+		return node.Name == "any"
 	case *ast.InterfaceType:
-		return e.Methods == nil || len(e.Methods.List) == 0
+		return node.Methods == nil || len(node.Methods.List) == 0
 	}
 	return false
 }

@@ -45,10 +45,27 @@ Available rules:
   interface-definition  interfaces should not be defined alongside their implementation
 `
 
+// ruleFlag is a flag.Value that accumulates rule names from repeated -flag or
+// comma-separated values: -disable foo -disable bar,baz all work.
+type ruleFlag map[string]bool
+
+func (rf ruleFlag) String() string { return "" }
+func (rf ruleFlag) Set(value string) error {
+	for _, part := range strings.Split(value, ",") {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			rf[part] = true
+		}
+	}
+	return nil
+}
+
 func main() {
-	enable := flag.String("enable", "", "comma-separated rules to enable (default: all)")
-	disable := flag.String("disable", "", "comma-separated rules to disable")
+	enable := make(ruleFlag)
+	disable := make(ruleFlag)
 	format := flag.String("format", "text", "output format: text or json")
+	flag.Var(enable, "enable", "rule to enable; may be repeated or comma-separated (default: all)")
+	flag.Var(disable, "disable", "rule to disable; may be repeated or comma-separated")
 	flag.Usage = func() { fmt.Fprint(os.Stderr, usage) }
 	flag.Parse()
 
@@ -60,12 +77,11 @@ func main() {
 	cfg := runner.Config{
 		Analyzers: analyzer.All(),
 	}
-
-	if *enable != "" {
-		cfg.Enabled = splitSet(*enable)
+	if len(enable) > 0 {
+		cfg.Enabled = enable
 	}
-	if *disable != "" {
-		cfg.Disabled = splitSet(*disable)
+	if len(disable) > 0 {
+		cfg.Disabled = disable
 	}
 
 	diags, err := runner.Run(patterns, cfg)
@@ -74,16 +90,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	var fmt_ report.Format
+	var outputFormat report.Format
 	switch *format {
 	case "json":
-		fmt_ = report.FormatJSON
+		outputFormat = report.FormatJSON
 	default:
-		fmt_ = report.FormatText
+		outputFormat = report.FormatText
 	}
 
-	writeErr := report.Write(os.Stdout, diags, fmt_)
-	if writeErr != nil {
+	if writeErr := report.Write(os.Stdout, diags, outputFormat); writeErr != nil {
 		fmt.Fprintf(os.Stderr, "error writing output: %v\n", writeErr)
 		os.Exit(1)
 	}
@@ -91,15 +106,4 @@ func main() {
 	if len(diags) > 0 {
 		os.Exit(1)
 	}
-}
-
-func splitSet(s string) map[string]bool {
-	m := make(map[string]bool)
-	for _, part := range strings.Split(s, ",") {
-		part = strings.TrimSpace(part)
-		if part != "" {
-			m[part] = true
-		}
-	}
-	return m
 }

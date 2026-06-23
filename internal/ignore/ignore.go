@@ -51,14 +51,12 @@ func Parse(fset *token.FileSet, file *ast.File) Set {
 				continue
 			}
 			rules := make(map[string]struct{})
-			rest := strings.TrimPrefix(text, prefix)
-			if rest == "" {
+			if rest := strings.TrimPrefix(text, prefix); rest == "" {
 				rules["*"] = struct{}{}
 			} else if after, ok := strings.CutPrefix(rest, ":"); ok {
 				// Everything up to the first whitespace is the rule list; the rest
 				// is an optional freetext reason.
-				parts := strings.FieldsFunc(after, func(r rune) bool { return r == ' ' || r == '\t' })
-				if len(parts) > 0 {
+				if parts := strings.FieldsFunc(after, func(r rune) bool { return r == ' ' || r == '\t' }); len(parts) > 0 {
 					for _, r := range strings.Split(parts[0], ",") {
 						r = strings.TrimSpace(r)
 						if r != "" {

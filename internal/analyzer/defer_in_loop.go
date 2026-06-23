@@ -30,30 +30,23 @@ func findDeferInLoop(pass *runner.Pass, node ast.Node, inLoop bool, diags *[]rep
 			return false
 		}
 
-		switch x := n.(type) {
-		case *ast.ForStmt, *ast.RangeStmt:
-			// Recurse with inLoop=true.
-			var body *ast.BlockStmt
-			switch v := x.(type) {
-			case *ast.ForStmt:
-				body = v.Body
-			case *ast.RangeStmt:
-				body = v.Body
-			}
-			if body != nil {
-				findDeferInLoop(pass, body, true, diags)
-			}
-			return false // already handled children
+		switch node := n.(type) {
+		case *ast.ForStmt:
+			findDeferInLoop(pass, node.Body, true, diags)
+			return false
+		case *ast.RangeStmt:
+			findDeferInLoop(pass, node.Body, true, diags)
+			return false
 
 		case *ast.FuncLit:
 			// Reset loop context for inner functions.
-			findDeferInLoop(pass, x.Body, false, diags)
+			findDeferInLoop(pass, node.Body, false, diags)
 			return false
 
 		case *ast.DeferStmt:
-			if inLoop && !ignore.IsSuppressed(pass.IgnoreSet, x.Pos(), "defer-in-loop") {
+			if inLoop && !ignore.IsSuppressed(pass.IgnoreSet, node.Pos(), "defer-in-loop") {
 				*diags = append(*diags, report.Diagnostic{
-					Pos:     pass.Fset.Position(x.Pos()),
+					Pos:     pass.Fset.Position(node.Pos()),
 					Rule:    "defer-in-loop",
 					Message: "defer inside loop will not execute until the function returns; extract the loop body into a separate function",
 				})
